@@ -1,0 +1,122 @@
+## initialize
+cd("/scratch1/10328/kl36552/data/fspPos");
+# reset workspace
+switchtolayout;
+selectall;
+delete;
+clear;
+importmaterialdb("../materialdata.mdf");
+## select variables
+# select binary directory
+ # need to change directory to where textfiles are
+sub_dir = dir;
+sub_dirs = splitstring(sub_dir,endl);
+
+# material data
+material = "SU8";
+ARC_material = 'ARC(400nm_1000nm)';
+Si_material = 'Si (Silicon) - Palik'; 
+
+## sim params (size of simulation space) 
+# mesh parameters;
+
+mesh_x = 20e-9;
+mesh_y = 20e-9;
+finer_mesh_size = 2.5e-6;
+mesh_accuracy = 1;
+z_max = 1e-6;
+setglobalmonitor("use wavelength spacing","1");
+sim_time = 15000;
+ARC_depth = 100e-9;
+si_depth = 1000e-9;
+
+## analysis code
+
+
+for(i = 3:length(sub_dirs)-1){
+    if(fileextension(sub_dirs{i})==''){
+        files = splitstring(dir(sub_dirs{i}),endl);
+        for(i2 = 3:length(files)-1){
+            if(fileextension(files{i2})=='txt'){
+		filename="../fspPre/"+filebasename(files{i2})+'.fsp';
+                if(~fileexists(filename)) {
+                    # add import and set variables
+                    ?("making file: " + filename);
+                    addimport;
+                    importbinary(sub_dirs{i}+'/'+files{i2});
+                    set("name", "structure");
+                    set("material", material);
+                    set("z max", 0);
+                    size_x = get("x span");
+                    size_y = get("y span"); 
+                    z_min = get("z min"); 
+                    #ARC 
+                    addrect;
+                    set('name','ARC');
+                    set('x',0);
+                    set('x span',size_x);
+                    set('y',0);
+                    set('y span',size_y);
+                    set('z max', z_min);
+                    set('z min',z_min-ARC_depth);
+                    set('material',ARC_material );
+                    addrect;
+                    set('name','Si');
+                    set('x',0);
+                    set('x span',size_x);
+                    set('y',0);
+                    set('y span',size_y);
+                    set('z max', z_min-ARC_depth);
+                    set('z min',z_min-ARC_depth-si_depth);
+                    set('material', Si_material);
+                    # add plane wave source
+                    addplane;
+                    set("injection axis","z");
+                    set("direction","backward");
+                    set("x",0);
+                    set("x span",size_x);
+                    set("y",0);
+                    set("y span",size_y);
+                    set("z",0.4e-6);
+                    set("wavelength start",0.4e-6);
+                    set("wavelength stop",1e-6);
+                    # add monitor
+                    addpower;
+                    set("monitor type",7);  # 2D z-normal
+                    set("x",0);
+                    set("x span",size_x);
+                    set("y",0);
+                    set("y span",size_y);
+                    set("z",0.6e-6);
+                    # FDTD 
+                    addfdtd;
+                    set('dimension','3D');
+                    set('index',1);
+                    set('mesh accuracy',mesh_accuracy);
+                    set('x',0.0);
+                    set('x span',size_x);
+                    set('y',0.0);
+                    set('y span',size_y);
+                    set('z min', z_min-ARC_depth-si_depth);
+                    set('z max', z_max);
+                    set('x max bc', 'Periodic');
+                    set('y max bc','Periodic');
+                    set('pml layers',12);
+                    set('simulation time',sim_time);
+                    # Set global monitor 
+                    setglobalmonitor("frequency points", 601);
+                    
+                    #run simulation
+                    save(filename);
+                    cd("../binary");
+                    del(sub_dirs{i}+"/"+files{i2});
+                    # initialize delete 
+                    switchtolayout;
+                    deleteall;
+                }
+            }
+        }
+    }
+}
+exit(2);
+

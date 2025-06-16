@@ -1,0 +1,49 @@
+##
+foldername = "/scratch1/10328/kl36552/data/fspPos/";
+cd(foldername);
+files = splitstring(dir,endl);
+fname = "logfile.txt";
+cmd="echo $(date +%Y%m%d_%H%M%S).log >> "+fname;
+system(cmd);
+logfile = read(fname);
+rm(fname);
+write(logfile,logfile+" started");
+cmd="echo \"$(date +%Y%m%d_%H%M%S): ";
+##
+for(i = 1:length(files)-1){
+    matFileName="../scatmat/"+filebasename(files{i})+".mat";
+    if((fileextension(files{i})=='fsp')&(!fileexists(matFileName))){
+        load(files{i});
+        stat=getresult("FDTD","status");
+	if(stat==2){
+		T=transmission("monitor");
+       		f = getdata("monitor","f");
+       		stat=getresult("FDTD","status");
+       		matlabsave(matFileName,T,f,stat);
+       		del(files{i});
+		system(cmd+"saved "+files{i}+".mat \" >> "+logfile); 
+		?("saved"+files{i}+".mat");
+	} else  {
+		if(stat==1){ 
+		       select("FDTD");
+	            simtime=get("simulation time");
+	            if(simtime<3e-12){
+		 switchtolayout();
+
+	            set("simulation time", simtime*2);
+                       save("../fspPre/"+files{i});
+		rm("../fspPos/"+files{i});
+		    system(cmd+"moved "+files{i}+"to fspPre \" >> "+logfile); 
+                        ?("moved"+files{i}+"to fspPre");
+	            } else {
+	                save("../failedSims/"+files{i});
+	                rm("../fspPos/"+files{i});
+	                system(cmd+"moved "+files{i}+" to failedSims \" >> "+logfile);
+	                ?("moved"+files{i}+"to failedSims");
+	            }
+		}	  
+	}
+    }
+    cd(foldername);
+}
+exit(2);
